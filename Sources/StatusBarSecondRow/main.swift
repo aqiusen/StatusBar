@@ -11,7 +11,6 @@ private let dragHandleWidth: CGFloat = 12
 private let controlGap: CGFloat = 2
 private let separatorGap: CGFloat = 6
 private let separatorWidth: CGFloat = 1
-private let appIconVerticalOffset: CGFloat = -2
 private let minWindowWidth: CGFloat = 70
 
 @MainActor
@@ -133,7 +132,7 @@ private final class AppRowWindow {
         stackView.orientation = .horizontal
         stackView.alignment = .centerY
         stackView.spacing = 7
-        stackView.edgeInsets = NSEdgeInsets(top: rowInset, left: rowInset, bottom: rowInset, right: rowInset)
+        stackView.edgeInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
         stackView.frame = NSRect(x: 0, y: 0, width: 1, height: rowHeight - 4)
 
         scrollView.documentView = stackView
@@ -669,7 +668,7 @@ private final class AppButton: NSButton {
 
         let rect = NSRect(
             x: bounds.midX - iconSize / 2,
-            y: bounds.midY - iconSize / 2 + appIconVerticalOffset,
+            y: bounds.midY - iconSize / 2,
             width: iconSize,
             height: iconSize
         )
