@@ -109,18 +109,8 @@ private final class AppRowWindow {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         panel.backgroundColor = .clear
         panel.isOpaque = false
-        panel.hasShadow = true
+        panel.hasShadow = false
         panel.hidesOnDeactivate = false
-
-        let background = NSVisualEffectView(frame: panel.contentView?.bounds ?? .zero)
-        background.translatesAutoresizingMaskIntoConstraints = false
-        background.autoresizingMask = [.width, .height]
-        background.blendingMode = .behindWindow
-        background.material = .menu
-        background.state = .active
-        background.wantsLayer = true
-        background.layer?.cornerRadius = 8
-        background.layer?.masksToBounds = true
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.drawsBackground = false
@@ -161,7 +151,6 @@ private final class AppRowWindow {
         }
 
         let root = NSView()
-        root.addSubview(background)
         root.addSubview(scrollView)
         root.addSubview(quitButton)
         root.addSubview(collapseButton)
@@ -171,11 +160,6 @@ private final class AppRowWindow {
         panel.contentView = root
 
         NSLayoutConstraint.activate([
-            background.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            background.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            background.topAnchor.constraint(equalTo: root.topAnchor),
-            background.bottomAnchor.constraint(equalTo: root.bottomAnchor),
-
             quitButton.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: rowInset),
             quitButton.centerYAnchor.constraint(equalTo: root.centerYAnchor),
             quitButton.widthAnchor.constraint(equalToConstant: controlButtonSize),
@@ -676,7 +660,7 @@ private final class AppButton: NSButton {
             in: rect,
             from: .zero,
             operation: .sourceOver,
-            fraction: isEnabled ? 1 : 0.35,
+            fraction: isEnabled ? (isHovering || isHighlighted ? 0.9 : 0.72) : 0.35,
             respectFlipped: true,
             hints: [.interpolation: NSImageInterpolation.high]
         )
