@@ -43,6 +43,7 @@ The packaged app and zip are written to `dist/`.
 - Handle: drag the row.
 - App icon: activate app.
 - Right-click app icon: open app actions.
+- `Control` + `Option` + `Command` + `B`: collapse or expand the row.
 
 ## macOS Notes
 

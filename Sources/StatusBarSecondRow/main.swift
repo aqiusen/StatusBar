@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import ServiceManagement
 
 private let rowHeight: CGFloat = 28
@@ -15,6 +16,7 @@ private let minWindowWidth: CGFloat = 70
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let appRow = AppRowWindow()
+    private var hotKeyController: HotKeyController?
     private var refreshTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -22,6 +24,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         appRow.show()
         observeWorkspace()
+        hotKeyController = HotKeyController {
+            Task { @MainActor [weak self] in
+                self?.appRow.toggleCollapsed()
+            }
+        }
 
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
             Task { @MainActor in
@@ -282,6 +289,9 @@ private final class AppRowWindow {
         launchAtLoginItem.target = self
         launchAtLoginItem.state = Self.launchAtLoginState
         menu.addItem(launchAtLoginItem)
+        let shortcutItem = NSMenuItem(title: "快捷键：⌃⌥⌘B", action: nil, keyEquivalent: "")
+        shortcutItem.isEnabled = false
+        menu.addItem(shortcutItem)
         menu.addItem(.separator())
 
         let quitItem = NSMenuItem(title: "退出 StatusBarSecondRow", action: #selector(quit), keyEquivalent: "")
@@ -304,7 +314,7 @@ private final class AppRowWindow {
         }
     }
 
-    @objc private func toggleCollapsed() {
+    @objc func toggleCollapsed() {
         isCollapsed.toggle()
         scrollView.isHidden = isCollapsed
         let symbol = isCollapsed ? "chevron.left.circle.fill" : "chevron.right.circle.fill"
@@ -494,6 +504,74 @@ private enum Defaults {
     static let isCollapsedKey = "isCollapsed"
     static let maxXKey = "windowMaxX"
     static let minYKey = "windowMinY"
+}
+
+private final class HotKeyController {
+    private var eventHotKey: EventHotKeyRef?
+    private var eventHandler: EventHandlerRef?
+    private let onPressed: () -> Void
+
+    init(onPressed: @escaping () -> Void) {
+        self.onPressed = onPressed
+        register()
+    }
+
+    deinit {
+        if let eventHotKey {
+            UnregisterEventHotKey(eventHotKey)
+        }
+        if let eventHandler {
+            RemoveEventHandler(eventHandler)
+        }
+    }
+
+    private func register() {
+        var eventType = EventTypeSpec(
+            eventClass: OSType(kEventClassKeyboard),
+            eventKind: UInt32(kEventHotKeyPressed)
+        )
+        let callback: EventHandlerUPP = { _, _, userData in
+            guard let userData else {
+                return noErr
+            }
+
+            let controller = Unmanaged<HotKeyController>
+                .fromOpaque(userData)
+                .takeUnretainedValue()
+            controller.onPressed()
+            return noErr
+        }
+
+        let handlerStatus = InstallEventHandler(
+            GetApplicationEventTarget(),
+            callback,
+            1,
+            &eventType,
+            Unmanaged.passUnretained(self).toOpaque(),
+            &eventHandler
+        )
+        guard handlerStatus == noErr else {
+            NSLog("Failed to install hotkey handler: \(handlerStatus)")
+            return
+        }
+
+        let hotKeyID = EventHotKeyID(signature: Self.fourCharCode("SBR2"), id: 1)
+        let hotKeyStatus = RegisterEventHotKey(
+            UInt32(kVK_ANSI_B),
+            UInt32(cmdKey | optionKey | controlKey),
+            hotKeyID,
+            GetApplicationEventTarget(),
+            0,
+            &eventHotKey
+        )
+        if hotKeyStatus != noErr {
+            NSLog("Failed to register hotkey: \(hotKeyStatus)")
+        }
+    }
+
+    private static func fourCharCode(_ value: String) -> OSType {
+        value.utf8.reduce(0) { ($0 << 8) + OSType($1) }
+    }
 }
 
 private final class ControlButton: NSButton {
