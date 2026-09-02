@@ -583,6 +583,27 @@ private final class AppButton: NSButton {
         }
     }
 
+    override func draw(_ dirtyRect: NSRect) {
+        guard let image else {
+            return
+        }
+
+        let rect = NSRect(
+            x: bounds.midX - iconSize / 2,
+            y: bounds.midY - iconSize / 2,
+            width: iconSize,
+            height: iconSize
+        )
+        image.draw(
+            in: rect,
+            from: .zero,
+            operation: .sourceOver,
+            fraction: isEnabled ? 1 : 0.35,
+            respectFlipped: true,
+            hints: [.interpolation: NSImageInterpolation.high]
+        )
+    }
+
     override func rightMouseDown(with event: NSEvent) {
         guard let menu else {
             return
