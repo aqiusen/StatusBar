@@ -88,14 +88,16 @@ enum StatusBarSecondRow {
 @MainActor
 private final class AppRowWindow {
     private let panel: NSPanel
+    private let background = NSVisualEffectView()
     private let scrollView = NSScrollView()
     private let stackView = NSStackView()
     private let collapseButton = ControlButton()
     private let settingsButton = ControlButton()
     private let separatorView = NSBox()
-    private var appButtons: [pid_t: NSButton] = [:]
+    private var appButtons: [pid_t: AppButton] = [:]
     private var hasFitInitialWidth = false
     private var isCollapsed = UserDefaults.standard.bool(forKey: Defaults.isCollapsedKey)
+    private var isTransparent = UserDefaults.standard.object(forKey: Defaults.isTransparentKey) as? Bool ?? true
 
     init() {
         panel = NSPanel(
@@ -109,8 +111,17 @@ private final class AppRowWindow {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         panel.backgroundColor = .clear
         panel.isOpaque = false
-        panel.hasShadow = false
+        panel.hasShadow = !isTransparent
         panel.hidesOnDeactivate = false
+
+        background.translatesAutoresizingMaskIntoConstraints = false
+        background.blendingMode = .behindWindow
+        background.material = .menu
+        background.state = .active
+        background.wantsLayer = true
+        background.layer?.cornerRadius = 8
+        background.layer?.masksToBounds = true
+        background.isHidden = isTransparent
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.drawsBackground = false
@@ -151,6 +162,7 @@ private final class AppRowWindow {
         }
 
         let root = NSView()
+        root.addSubview(background)
         root.addSubview(scrollView)
         root.addSubview(quitButton)
         root.addSubview(collapseButton)
@@ -160,6 +172,11 @@ private final class AppRowWindow {
         panel.contentView = root
 
         NSLayoutConstraint.activate([
+            background.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            background.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            background.topAnchor.constraint(equalTo: root.topAnchor),
+            background.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+
             quitButton.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: rowInset),
             quitButton.centerYAnchor.constraint(equalTo: root.centerYAnchor),
             quitButton.widthAnchor.constraint(equalToConstant: controlButtonSize),
@@ -221,6 +238,7 @@ private final class AppRowWindow {
 
         for app in apps where appButtons[app.processIdentifier] == nil {
             let button = Self.button(for: app)
+            button.usesTransparentStyle = isTransparent
             button.target = self
             button.action = #selector(activateApp(_:))
             button.menu = appMenu(for: app)
@@ -265,6 +283,11 @@ private final class AppRowWindow {
 
     @objc private func showSettingsMenu(_ sender: NSButton) {
         let menu = NSMenu()
+        let transparencyItem = NSMenuItem(title: "透明模式", action: #selector(toggleTransparency), keyEquivalent: "")
+        transparencyItem.target = self
+        transparencyItem.state = isTransparent ? .on : .off
+        menu.addItem(transparencyItem)
+
         let launchAtLoginItem = NSMenuItem(
             title: Self.launchAtLoginTitle,
             action: #selector(toggleLaunchAtLogin),
@@ -283,6 +306,14 @@ private final class AppRowWindow {
         menu.addItem(quitItem)
 
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY + 4), in: sender)
+    }
+
+    @objc private func toggleTransparency() {
+        isTransparent.toggle()
+        UserDefaults.standard.set(isTransparent, forKey: Defaults.isTransparentKey)
+        background.isHidden = isTransparent
+        panel.hasShadow = !isTransparent
+        appButtons.values.forEach { $0.usesTransparentStyle = isTransparent }
     }
 
     @objc private func toggleLaunchAtLogin() {
@@ -486,6 +517,7 @@ private final class AppRowWindow {
 
 private enum Defaults {
     static let isCollapsedKey = "isCollapsed"
+    static let isTransparentKey = "isTransparent"
     static let maxXKey = "windowMaxX"
     static let minYKey = "windowMinY"
 }
@@ -607,6 +639,9 @@ private final class ControlButton: NSButton {
 
 private final class AppButton: NSButton {
     weak var runningApp: NSRunningApplication?
+    var usesTransparentStyle = true {
+        didSet { needsDisplay = true }
+    }
     private var isHovering = false
 
     override init(frame frameRect: NSRect) {
@@ -660,7 +695,7 @@ private final class AppButton: NSButton {
             in: rect,
             from: .zero,
             operation: .sourceOver,
-            fraction: isEnabled ? (isHovering || isHighlighted ? 0.9 : 0.72) : 0.35,
+            fraction: isEnabled ? (isHovering || isHighlighted ? (usesTransparentStyle ? 0.9 : 1) : (usesTransparentStyle ? 0.72 : 1)) : 0.35,
             respectFlipped: true,
             hints: [.interpolation: NSImageInterpolation.high]
         )
