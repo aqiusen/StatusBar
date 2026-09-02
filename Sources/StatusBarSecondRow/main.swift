@@ -289,7 +289,7 @@ private final class AppRowWindow {
         launchAtLoginItem.target = self
         launchAtLoginItem.state = Self.launchAtLoginState
         menu.addItem(launchAtLoginItem)
-        let shortcutItem = NSMenuItem(title: "快捷键：⌃⌥⌘B", action: nil, keyEquivalent: "")
+        let shortcutItem = NSMenuItem(title: "快捷键：⌃⌥B", action: nil, keyEquivalent: "")
         shortcutItem.isEnabled = false
         menu.addItem(shortcutItem)
         menu.addItem(.separator())
@@ -558,7 +558,7 @@ private final class HotKeyController {
         let hotKeyID = EventHotKeyID(signature: Self.fourCharCode("SBR2"), id: 1)
         let hotKeyStatus = RegisterEventHotKey(
             UInt32(kVK_ANSI_B),
-            UInt32(cmdKey | optionKey | controlKey),
+            UInt32(optionKey | controlKey),
             hotKeyID,
             GetApplicationEventTarget(),
             0,
