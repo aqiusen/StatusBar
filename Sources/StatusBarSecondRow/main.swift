@@ -11,6 +11,7 @@ private let dragHandleWidth: CGFloat = 12
 private let controlGap: CGFloat = 2
 private let separatorGap: CGFloat = 6
 private let separatorWidth: CGFloat = 1
+private let opticalVerticalOffset: CGFloat = -1
 private let minWindowWidth: CGFloat = 70
 
 @MainActor
@@ -177,27 +178,27 @@ private final class AppRowWindow {
             background.bottomAnchor.constraint(equalTo: root.bottomAnchor),
 
             quitButton.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: rowInset),
-            quitButton.centerYAnchor.constraint(equalTo: root.centerYAnchor),
+            quitButton.centerYAnchor.constraint(equalTo: root.centerYAnchor, constant: opticalVerticalOffset),
             quitButton.widthAnchor.constraint(equalToConstant: controlButtonSize),
             quitButton.heightAnchor.constraint(equalToConstant: controlButtonSize),
 
             collapseButton.leadingAnchor.constraint(equalTo: quitButton.trailingAnchor, constant: controlGap),
-            collapseButton.centerYAnchor.constraint(equalTo: root.centerYAnchor),
+            collapseButton.centerYAnchor.constraint(equalTo: root.centerYAnchor, constant: opticalVerticalOffset),
             collapseButton.widthAnchor.constraint(equalToConstant: controlButtonSize),
             collapseButton.heightAnchor.constraint(equalToConstant: controlButtonSize),
 
             settingsButton.leadingAnchor.constraint(equalTo: collapseButton.trailingAnchor, constant: controlGap),
-            settingsButton.centerYAnchor.constraint(equalTo: root.centerYAnchor),
+            settingsButton.centerYAnchor.constraint(equalTo: root.centerYAnchor, constant: opticalVerticalOffset),
             settingsButton.widthAnchor.constraint(equalToConstant: controlButtonSize),
             settingsButton.heightAnchor.constraint(equalToConstant: controlButtonSize),
 
             dragHandle.leadingAnchor.constraint(equalTo: settingsButton.trailingAnchor, constant: controlGap),
-            dragHandle.centerYAnchor.constraint(equalTo: root.centerYAnchor),
+            dragHandle.centerYAnchor.constraint(equalTo: root.centerYAnchor, constant: opticalVerticalOffset),
             dragHandle.widthAnchor.constraint(equalToConstant: dragHandleWidth),
             dragHandle.heightAnchor.constraint(equalToConstant: controlButtonSize),
 
             separatorView.leadingAnchor.constraint(equalTo: dragHandle.trailingAnchor, constant: separatorGap),
-            separatorView.centerYAnchor.constraint(equalTo: root.centerYAnchor),
+            separatorView.centerYAnchor.constraint(equalTo: root.centerYAnchor, constant: opticalVerticalOffset),
             separatorView.widthAnchor.constraint(equalToConstant: separatorWidth),
             separatorView.heightAnchor.constraint(equalToConstant: 14),
 
@@ -668,7 +669,7 @@ private final class AppButton: NSButton {
 
         let rect = NSRect(
             x: bounds.midX - iconSize / 2,
-            y: bounds.midY - iconSize / 2,
+            y: bounds.midY - iconSize / 2 + opticalVerticalOffset,
             width: iconSize,
             height: iconSize
         )
