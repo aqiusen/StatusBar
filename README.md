@@ -14,6 +14,7 @@ StatusBarSecondRow floats below the macOS menu bar and shows running app icons i
 - Collapse the app list into a tiny control strip, then expand it again.
 - Drag the row with the handle; it stays inside the visible screen bounds.
 - Remembers the last position and collapsed state.
+- Toggle launch at login from the settings menu.
 - Uses a native translucent macOS panel.
 
 ## Install
@@ -38,6 +39,7 @@ The packaged app and zip are written to `dist/`.
 
 - `x`: quit StatusBarSecondRow.
 - `>` / `<`: collapse or expand the app icon list.
+- Gear: open settings, including launch at login.
 - Handle: drag the row.
 - App icon: activate app.
 - Right-click app icon: open app actions.

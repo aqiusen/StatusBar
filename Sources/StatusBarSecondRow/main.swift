@@ -1,4 +1,5 @@
 import AppKit
+import ServiceManagement
 
 private let rowHeight: CGFloat = 28
 private let rowInset: CGFloat = 4
@@ -83,6 +84,7 @@ private final class AppRowWindow {
     private let scrollView = NSScrollView()
     private let stackView = NSStackView()
     private let collapseButton = ControlButton()
+    private let settingsButton = ControlButton()
     private let separatorView = NSBox()
     private var appButtons: [pid_t: NSButton] = [:]
     private var hasFitInitialWidth = false
@@ -141,6 +143,10 @@ private final class AppRowWindow {
         collapseButton.target = self
         collapseButton.action = #selector(toggleCollapsed)
 
+        Self.configureIconButton(settingsButton, symbol: "gearshape.fill", tooltip: "设置")
+        settingsButton.target = self
+        settingsButton.action = #selector(showSettingsMenu(_:))
+
         let dragHandle = DragHandleView()
         dragHandle.translatesAutoresizingMaskIntoConstraints = false
         dragHandle.onDragEnded = { [weak self] frame in
@@ -152,6 +158,7 @@ private final class AppRowWindow {
         root.addSubview(scrollView)
         root.addSubview(quitButton)
         root.addSubview(collapseButton)
+        root.addSubview(settingsButton)
         root.addSubview(dragHandle)
         root.addSubview(separatorView)
         panel.contentView = root
@@ -172,7 +179,12 @@ private final class AppRowWindow {
             collapseButton.widthAnchor.constraint(equalToConstant: controlButtonSize),
             collapseButton.heightAnchor.constraint(equalToConstant: controlButtonSize),
 
-            dragHandle.leadingAnchor.constraint(equalTo: collapseButton.trailingAnchor, constant: controlGap),
+            settingsButton.leadingAnchor.constraint(equalTo: collapseButton.trailingAnchor, constant: controlGap),
+            settingsButton.centerYAnchor.constraint(equalTo: root.centerYAnchor),
+            settingsButton.widthAnchor.constraint(equalToConstant: controlButtonSize),
+            settingsButton.heightAnchor.constraint(equalToConstant: controlButtonSize),
+
+            dragHandle.leadingAnchor.constraint(equalTo: settingsButton.trailingAnchor, constant: controlGap),
             dragHandle.centerYAnchor.constraint(equalTo: root.centerYAnchor),
             dragHandle.widthAnchor.constraint(equalToConstant: dragHandleWidth),
             dragHandle.heightAnchor.constraint(equalToConstant: controlButtonSize),
@@ -260,6 +272,38 @@ private final class AppRowWindow {
         NSApp.terminate(nil)
     }
 
+    @objc private func showSettingsMenu(_ sender: NSButton) {
+        let menu = NSMenu()
+        let launchAtLoginItem = NSMenuItem(
+            title: Self.launchAtLoginTitle,
+            action: #selector(toggleLaunchAtLogin),
+            keyEquivalent: ""
+        )
+        launchAtLoginItem.target = self
+        launchAtLoginItem.state = Self.launchAtLoginState
+        menu.addItem(launchAtLoginItem)
+        menu.addItem(.separator())
+
+        let quitItem = NSMenuItem(title: "退出 StatusBarSecondRow", action: #selector(quit), keyEquivalent: "")
+        quitItem.target = self
+        menu.addItem(quitItem)
+
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY + 4), in: sender)
+    }
+
+    @objc private func toggleLaunchAtLogin() {
+        do {
+            if SMAppService.mainApp.status == .enabled {
+                try SMAppService.mainApp.unregister()
+            } else {
+                try SMAppService.mainApp.register()
+            }
+        } catch {
+            NSSound.beep()
+            NSLog("Failed to update launch at login: \(error.localizedDescription)")
+        }
+    }
+
     @objc private func toggleCollapsed() {
         isCollapsed.toggle()
         scrollView.isHidden = isCollapsed
@@ -305,6 +349,21 @@ private final class AppRowWindow {
         ])
 
         return button
+    }
+
+    private static var launchAtLoginTitle: String {
+        SMAppService.mainApp.status == .requiresApproval ? "开机启动（需系统批准）" : "开机启动"
+    }
+
+    private static var launchAtLoginState: NSControl.StateValue {
+        switch SMAppService.mainApp.status {
+        case .enabled:
+            return .on
+        case .requiresApproval:
+            return .mixed
+        default:
+            return .off
+        }
     }
 
     private func appMenu(for app: NSRunningApplication) -> NSMenu {
@@ -368,7 +427,7 @@ private final class AppRowWindow {
     }
 
     private func fitWindowToContent() {
-        let collapsedWidth = rowInset + controlButtonSize + controlGap + controlButtonSize + controlGap + dragHandleWidth + rowInset
+        let collapsedWidth = rowInset + controlButtonSize + controlGap + controlButtonSize + controlGap + controlButtonSize + controlGap + dragHandleWidth + rowInset
         let expandedWidth = collapsedWidth + separatorGap + separatorWidth + separatorGap + rowInset
         let fixedWidth = isCollapsed ? collapsedWidth : expandedWidth
         let desiredWidth = fixedWidth + (isCollapsed ? 0 : stackView.frame.width)
