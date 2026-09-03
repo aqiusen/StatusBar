@@ -300,15 +300,25 @@ private final class AppRowWindow {
         shortcutLabel.textColor = .secondaryLabelColor
 
         let stack = NSStackView(views: [transparencyButton, launchAtLoginButton, shortcutLabel])
+        stack.translatesAutoresizingMaskIntoConstraints = false
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 8
-        stack.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+
+        let contentSize = NSSize(width: 180, height: 86)
+        let contentView = NSView(frame: NSRect(origin: .zero, size: contentSize))
+        contentView.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+            stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+            stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
+            stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12)
+        ])
 
         let controller = NSViewController()
-        controller.view = stack
+        controller.view = contentView
         settingsPopover.contentViewController = controller
-        settingsPopover.contentSize = NSSize(width: 180, height: 86)
+        settingsPopover.contentSize = contentSize
         settingsPopover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
     }
 
