@@ -93,6 +93,7 @@ private final class AppRowWindow {
     private let stackView = NSStackView()
     private let collapseButton = ControlButton()
     private let settingsButton = ControlButton()
+    private let settingsPopover = NSPopover()
     private let separatorView = NSBox()
     private var appButtons: [pid_t: AppButton] = [:]
     private var hasFitInitialWidth = false
@@ -113,6 +114,8 @@ private final class AppRowWindow {
         panel.isOpaque = false
         panel.hasShadow = !isTransparent
         panel.hidesOnDeactivate = false
+
+        settingsPopover.behavior = .transient
 
         background.translatesAutoresizingMaskIntoConstraints = false
         background.blendingMode = .behindWindow
@@ -153,7 +156,7 @@ private final class AppRowWindow {
 
         Self.configureIconButton(settingsButton, symbol: "gearshape.fill", tooltip: "设置")
         settingsButton.target = self
-        settingsButton.action = #selector(showSettingsMenu(_:))
+        settingsButton.action = #selector(toggleSettingsPopover(_:))
 
         let dragHandle = DragHandleView()
         dragHandle.translatesAutoresizingMaskIntoConstraints = false
@@ -281,31 +284,32 @@ private final class AppRowWindow {
         NSApp.terminate(nil)
     }
 
-    @objc private func showSettingsMenu(_ sender: NSButton) {
-        let menu = NSMenu()
-        let transparencyItem = NSMenuItem(title: "透明模式", action: #selector(toggleTransparency), keyEquivalent: "")
-        transparencyItem.target = self
-        transparencyItem.state = isTransparent ? .on : .off
-        menu.addItem(transparencyItem)
+    @objc private func toggleSettingsPopover(_ sender: NSButton) {
+        guard !settingsPopover.isShown else {
+            settingsPopover.performClose(nil)
+            return
+        }
 
-        let launchAtLoginItem = NSMenuItem(
-            title: Self.launchAtLoginTitle,
-            action: #selector(toggleLaunchAtLogin),
-            keyEquivalent: ""
-        )
-        launchAtLoginItem.target = self
-        launchAtLoginItem.state = Self.launchAtLoginState
-        menu.addItem(launchAtLoginItem)
-        let shortcutItem = NSMenuItem(title: "快捷键：⌃⌥B", action: nil, keyEquivalent: "")
-        shortcutItem.isEnabled = false
-        menu.addItem(shortcutItem)
-        menu.addItem(.separator())
+        let transparencyButton = NSButton(checkboxWithTitle: "透明模式", target: self, action: #selector(toggleTransparency))
+        transparencyButton.state = isTransparent ? .on : .off
 
-        let quitItem = NSMenuItem(title: "退出 StatusBarSecondRow", action: #selector(quit), keyEquivalent: "")
-        quitItem.target = self
-        menu.addItem(quitItem)
+        let launchAtLoginButton = NSButton(checkboxWithTitle: Self.launchAtLoginTitle, target: self, action: #selector(toggleLaunchAtLogin))
+        launchAtLoginButton.state = Self.launchAtLoginState
 
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY + 4), in: sender)
+        let shortcutLabel = NSTextField(labelWithString: "快捷键：⌃⌥B")
+        shortcutLabel.textColor = .secondaryLabelColor
+
+        let stack = NSStackView(views: [transparencyButton, launchAtLoginButton, shortcutLabel])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 8
+        stack.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+
+        let controller = NSViewController()
+        controller.view = stack
+        settingsPopover.contentViewController = controller
+        settingsPopover.contentSize = NSSize(width: 180, height: 86)
+        settingsPopover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
     }
 
     @objc private func toggleTransparency() {
