@@ -12,6 +12,7 @@ private let controlGap: CGFloat = 2
 private let separatorGap: CGFloat = 6
 private let separatorWidth: CGFloat = 1
 private let minWindowWidth: CGFloat = 70
+private let collapsedMascotWidth: CGFloat = 32
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -91,10 +92,14 @@ private final class AppRowWindow {
     private let background = NSVisualEffectView()
     private let scrollView = NSScrollView()
     private let stackView = NSStackView()
+    private let quitButton = ControlButton()
     private let collapseButton = ControlButton()
     private let settingsButton = ControlButton()
+    private let dragHandle = DragHandleView()
+    private let collapsedMascot = CollapsedMascotView()
     private let settingsPopover = NSPopover()
     private let separatorView = NSBox()
+    private var regularLayoutConstraints: [NSLayoutConstraint] = []
     private var appButtons: [pid_t: AppButton] = [:]
     private var hasFitInitialWidth = false
     private var isCollapsed = UserDefaults.standard.bool(forKey: Defaults.isCollapsedKey)
@@ -142,7 +147,7 @@ private final class AppRowWindow {
         separatorView.translatesAutoresizingMaskIntoConstraints = false
         separatorView.boxType = .separator
 
-        let quitButton = Self.iconButton(symbol: "xmark.circle.fill", tooltip: "退出")
+        Self.configureIconButton(quitButton, symbol: "xmark.circle.fill", tooltip: "退出")
         quitButton.target = self
         quitButton.action = #selector(quit)
 
@@ -153,9 +158,19 @@ private final class AppRowWindow {
         settingsButton.target = self
         settingsButton.action = #selector(toggleSettingsPopover(_:))
 
-        let dragHandle = DragHandleView()
         dragHandle.translatesAutoresizingMaskIntoConstraints = false
         dragHandle.onDragEnded = { [weak self] frame in
+            self?.save(frame: frame)
+        }
+
+        collapsedMascot.translatesAutoresizingMaskIntoConstraints = false
+        collapsedMascot.onExpand = { [weak self] in
+            self?.expand()
+        }
+        collapsedMascot.onQuit = { [weak self] in
+            self?.quit()
+        }
+        collapsedMascot.onDragEnded = { [weak self] frame in
             self?.save(frame: frame)
         }
 
@@ -166,6 +181,7 @@ private final class AppRowWindow {
         root.addSubview(collapseButton)
         root.addSubview(settingsButton)
         root.addSubview(dragHandle)
+        root.addSubview(collapsedMascot)
         root.addSubview(separatorView)
         panel.contentView = root
 
@@ -175,6 +191,13 @@ private final class AppRowWindow {
             background.topAnchor.constraint(equalTo: root.topAnchor),
             background.bottomAnchor.constraint(equalTo: root.bottomAnchor),
 
+            collapsedMascot.centerXAnchor.constraint(equalTo: root.centerXAnchor),
+            collapsedMascot.centerYAnchor.constraint(equalTo: root.centerYAnchor),
+            collapsedMascot.widthAnchor.constraint(equalToConstant: collapsedMascotWidth),
+            collapsedMascot.heightAnchor.constraint(equalToConstant: rowHeight)
+        ])
+
+        regularLayoutConstraints = [
             quitButton.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: rowInset),
             quitButton.centerYAnchor.constraint(equalTo: root.centerYAnchor),
             quitButton.widthAnchor.constraint(equalToConstant: controlButtonSize),
@@ -204,7 +227,8 @@ private final class AppRowWindow {
             scrollView.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -rowInset),
             scrollView.topAnchor.constraint(equalTo: root.topAnchor, constant: 2),
             scrollView.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -2)
-        ])
+        ]
+        NSLayoutConstraint.activate(regularLayoutConstraints)
 
         updateCollapsedAppearance()
         applyTransparencyStyle()
@@ -343,9 +367,20 @@ private final class AppRowWindow {
         fitWindowToContent()
     }
 
+    private func expand() {
+        guard isCollapsed else {
+            return
+        }
+
+        toggleCollapsed()
+    }
+
     private func updateCollapsedAppearance() {
-        scrollView.isHidden = isCollapsed
-        separatorView.isHidden = isCollapsed
+        regularLayoutConstraints.forEach { $0.isActive = !isCollapsed }
+        [quitButton, collapseButton, settingsButton, dragHandle, separatorView, scrollView].forEach {
+            $0.isHidden = isCollapsed
+        }
+        collapsedMascot.isHidden = !isCollapsed
         let symbol = isCollapsed ? "chevron.left.circle.fill" : "chevron.right.circle.fill"
         let tooltip = isCollapsed ? "展开" : "收起"
         Self.configureIconButton(collapseButton, symbol: symbol, tooltip: tooltip)
@@ -436,12 +471,6 @@ private final class AppRowWindow {
         return NSRunningApplication(processIdentifier: pid)
     }
 
-    private static func iconButton(symbol: String, tooltip: String) -> NSButton {
-        let button = ControlButton()
-        configureIconButton(button, symbol: symbol, tooltip: tooltip)
-        return button
-    }
-
     private static func configureIconButton(_ button: NSButton, symbol: String, tooltip: String) {
         button.title = ""
         button.translatesAutoresizingMaskIntoConstraints = false
@@ -467,15 +496,15 @@ private final class AppRowWindow {
     }
 
     private func fitWindowToContent() {
-        let collapsedWidth = rowInset + controlButtonSize + controlGap + controlButtonSize + controlGap + controlButtonSize + controlGap + dragHandleWidth + rowInset
-        let expandedWidth = collapsedWidth + separatorGap + separatorWidth + separatorGap + rowInset
-        let fixedWidth = isCollapsed ? collapsedWidth : expandedWidth
-        let desiredWidth = fixedWidth + (isCollapsed ? 0 : stackView.frame.width)
+        let controlsWidth = rowInset + controlButtonSize + controlGap + controlButtonSize + controlGap + controlButtonSize + controlGap + dragHandleWidth + rowInset
+        let expandedWidth = controlsWidth + separatorGap + separatorWidth + separatorGap + rowInset
+        let minimumWidth = isCollapsed ? collapsedMascotWidth : minWindowWidth
+        let desiredWidth = isCollapsed ? collapsedMascotWidth : expandedWidth + stackView.frame.width
         let frame = hasFitInitialWidth
             ? NSRect(x: panel.frame.maxX - desiredWidth, y: panel.frame.minY, width: desiredWidth, height: rowHeight)
-            : Self.windowFrame(width: desiredWidth, savedMaxX: UserDefaults.standard.object(forKey: Defaults.maxXKey) as? CGFloat, savedMinY: UserDefaults.standard.object(forKey: Defaults.minYKey) as? CGFloat)
+            : Self.windowFrame(width: desiredWidth, minimumWidth: minimumWidth, savedMaxX: UserDefaults.standard.object(forKey: Defaults.maxXKey) as? CGFloat, savedMinY: UserDefaults.standard.object(forKey: Defaults.minYKey) as? CGFloat)
 
-        let clampedFrame = Self.clamped(frame)
+        let clampedFrame = Self.clamped(frame, minimumWidth: minimumWidth)
         panel.setFrame(clampedFrame, display: true)
         save(frame: clampedFrame)
         hasFitInitialWidth = true
@@ -486,19 +515,24 @@ private final class AppRowWindow {
         UserDefaults.standard.set(frame.minY, forKey: Defaults.minYKey)
     }
 
-    private static func windowFrame(width requestedWidth: CGFloat, savedMaxX: CGFloat? = nil, savedMinY: CGFloat? = nil) -> NSRect {
+    private static func windowFrame(
+        width requestedWidth: CGFloat,
+        minimumWidth: CGFloat = minWindowWidth,
+        savedMaxX: CGFloat? = nil,
+        savedMinY: CGFloat? = nil
+    ) -> NSRect {
         let screen = NSScreen.main ?? NSScreen.screens.first
         let visibleFrame = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 900, height: 600)
-        let width = min(max(minWindowWidth, requestedWidth), max(minWindowWidth, visibleFrame.width - 16))
+        let width = min(max(minimumWidth, requestedWidth), max(minimumWidth, visibleFrame.width - 16))
         let x = (savedMaxX ?? visibleFrame.maxX - 8) - width
         let y = savedMinY ?? visibleFrame.maxY - rowHeight - 4
         return NSRect(x: x, y: y, width: width, height: rowHeight)
     }
 
-    fileprivate static func clamped(_ frame: NSRect) -> NSRect {
+    fileprivate static func clamped(_ frame: NSRect, minimumWidth: CGFloat = 1) -> NSRect {
         let screen = NSScreen.screens.first { $0.frame.intersects(frame) } ?? NSScreen.main ?? NSScreen.screens.first
         let visibleFrame = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 900, height: 600)
-        let width = min(frame.width, max(minWindowWidth, visibleFrame.width - 16))
+        let width = min(max(minimumWidth, frame.width), max(minimumWidth, visibleFrame.width - 16))
         let minX = visibleFrame.minX + 8
         let maxX = visibleFrame.maxX - width - 8
         let minY = visibleFrame.minY + 8
@@ -737,11 +771,46 @@ private final class AppButton: NSButton {
     }
 }
 
-private final class DragHandleView: NSView {
-    private let imageView = NSImageView()
+private class DraggableView: NSView {
+    var onDragEnded: ((NSRect) -> Void)?
     private var dragStartFrame: NSRect?
     private var dragStartMouseLocation: NSPoint?
-    var onDragEnded: ((NSRect) -> Void)?
+
+    override func mouseDown(with event: NSEvent) {
+        dragStartFrame = window?.frame
+        dragStartMouseLocation = NSEvent.mouseLocation
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let window,
+              let dragStartFrame,
+              let dragStartMouseLocation else {
+            return
+        }
+
+        let mouseLocation = NSEvent.mouseLocation
+        let targetFrame = NSRect(
+            x: dragStartFrame.minX + mouseLocation.x - dragStartMouseLocation.x,
+            y: dragStartFrame.minY + mouseLocation.y - dragStartMouseLocation.y,
+            width: dragStartFrame.width,
+            height: dragStartFrame.height
+        )
+
+        window.setFrame(AppRowWindow.clamped(targetFrame), display: true)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        if let frame = window?.frame {
+            onDragEnded?(frame)
+        }
+
+        dragStartFrame = nil
+        dragStartMouseLocation = nil
+    }
+}
+
+private final class DragHandleView: DraggableView {
+    private let imageView = NSImageView()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -788,36 +857,86 @@ private final class DragHandleView: NSView {
         imageView.alphaValue = 0.5
     }
 
-    override func mouseDown(with event: NSEvent) {
-        dragStartFrame = window?.frame
-        dragStartMouseLocation = NSEvent.mouseLocation
+}
+
+private final class CollapsedMascotView: DraggableView {
+    private let imageView = NSImageView()
+    var onExpand: (() -> Void)?
+    var onQuit: (() -> Void)?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+
+        toolTip = "双击展开，右键查看选项"
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        imageView.image = Self.mascotImage
+        imageView.imageScaling = .scaleProportionallyUpOrDown
+        imageView.wantsLayer = true
+        addSubview(imageView)
+
+        NSLayoutConstraint.activate([
+            imageView.centerXAnchor.constraint(equalTo: centerXAnchor),
+            imageView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            imageView.widthAnchor.constraint(equalToConstant: 24),
+            imageView.heightAnchor.constraint(equalToConstant: 24)
+        ])
     }
 
-    override func mouseDragged(with event: NSEvent) {
-        guard let window,
-              let dragStartFrame,
-              let dragStartMouseLocation else {
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil else {
+            imageView.layer?.removeAnimation(forKey: "idleFloat")
             return
         }
 
-        let mouseLocation = NSEvent.mouseLocation
-        let targetFrame = NSRect(
-            x: dragStartFrame.minX + mouseLocation.x - dragStartMouseLocation.x,
-            y: dragStartFrame.minY + mouseLocation.y - dragStartMouseLocation.y,
-            width: dragStartFrame.width,
-            height: dragStartFrame.height
-        )
-
-        window.setFrame(AppRowWindow.clamped(targetFrame), display: true)
+        let animation = CABasicAnimation(keyPath: "transform.translation.y")
+        animation.fromValue = -1
+        animation.toValue = 1
+        animation.duration = 1.1
+        animation.autoreverses = true
+        animation.repeatCount = .infinity
+        imageView.layer?.add(animation, forKey: "idleFloat")
     }
 
-    override func mouseUp(with event: NSEvent) {
-        if let frame = window?.frame {
-            onDragEnded?(frame)
+    override func mouseDown(with event: NSEvent) {
+        guard event.clickCount < 2 else {
+            onExpand?()
+            return
         }
 
-        dragStartFrame = nil
-        dragStartMouseLocation = nil
+        super.mouseDown(with: event)
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        let menu = NSMenu()
+        let expandItem = NSMenuItem(title: "展开", action: #selector(expand), keyEquivalent: "")
+        expandItem.target = self
+        menu.addItem(expandItem)
+
+        let quitItem = NSMenuItem(title: "退出 StatusBarSecondRow", action: #selector(quit), keyEquivalent: "")
+        quitItem.target = self
+        menu.addItem(quitItem)
+        NSMenu.popUpContextMenu(menu, with: event, for: self)
+    }
+
+    @objc private func expand() {
+        onExpand?()
+    }
+
+    @objc private func quit() {
+        onQuit?()
+    }
+
+    private static var mascotImage: NSImage? {
+        guard let url = Bundle.main.url(forResource: "CollapsedMascot", withExtension: "png") else {
+            return NSImage(systemSymbolName: "bolt.circle.fill", accessibilityDescription: "展开")
+        }
+
+        return NSImage(contentsOf: url)
     }
 }
 
