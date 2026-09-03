@@ -112,7 +112,6 @@ private final class AppRowWindow {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         panel.backgroundColor = .clear
         panel.isOpaque = false
-        panel.hasShadow = !isTransparent
         panel.hidesOnDeactivate = false
 
         settingsPopover.behavior = .transient
@@ -124,7 +123,6 @@ private final class AppRowWindow {
         background.wantsLayer = true
         background.layer?.cornerRadius = 8
         background.layer?.masksToBounds = true
-        background.isHidden = isTransparent
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.drawsBackground = false
@@ -148,9 +146,6 @@ private final class AppRowWindow {
         quitButton.target = self
         quitButton.action = #selector(quit)
 
-        let collapseSymbol = isCollapsed ? "chevron.left.circle.fill" : "chevron.right.circle.fill"
-        let collapseTooltip = isCollapsed ? "展开" : "收起"
-        Self.configureIconButton(collapseButton, symbol: collapseSymbol, tooltip: collapseTooltip)
         collapseButton.target = self
         collapseButton.action = #selector(toggleCollapsed)
 
@@ -211,8 +206,8 @@ private final class AppRowWindow {
             scrollView.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -2)
         ])
 
-        scrollView.isHidden = isCollapsed
-        separatorView.isHidden = isCollapsed
+        updateCollapsedAppearance()
+        applyTransparencyStyle()
         reloadApps()
     }
 
@@ -325,9 +320,7 @@ private final class AppRowWindow {
     @objc private func toggleTransparency() {
         isTransparent.toggle()
         UserDefaults.standard.set(isTransparent, forKey: Defaults.isTransparentKey)
-        background.isHidden = isTransparent
-        panel.hasShadow = !isTransparent
-        appButtons.values.forEach { $0.usesTransparentStyle = isTransparent }
+        applyTransparencyStyle()
     }
 
     @objc private func toggleLaunchAtLogin() {
@@ -345,15 +338,23 @@ private final class AppRowWindow {
 
     @objc func toggleCollapsed() {
         isCollapsed.toggle()
+        UserDefaults.standard.set(isCollapsed, forKey: Defaults.isCollapsedKey)
+        updateCollapsedAppearance()
+        fitWindowToContent()
+    }
+
+    private func updateCollapsedAppearance() {
         scrollView.isHidden = isCollapsed
+        separatorView.isHidden = isCollapsed
         let symbol = isCollapsed ? "chevron.left.circle.fill" : "chevron.right.circle.fill"
         let tooltip = isCollapsed ? "展开" : "收起"
-        collapseButton.image = NSImage(systemSymbolName: symbol, accessibilityDescription: tooltip)
-        collapseButton.image?.size = NSSize(width: 13, height: 13)
-        collapseButton.toolTip = tooltip
-        UserDefaults.standard.set(isCollapsed, forKey: Defaults.isCollapsedKey)
-        separatorView.isHidden = isCollapsed
-        fitWindowToContent()
+        Self.configureIconButton(collapseButton, symbol: symbol, tooltip: tooltip)
+    }
+
+    private func applyTransparencyStyle() {
+        background.isHidden = isTransparent
+        panel.hasShadow = !isTransparent
+        appButtons.values.forEach { $0.usesTransparentStyle = isTransparent }
     }
 
     private static func shouldShow(_ app: NSRunningApplication, visibleWindowPIDs: Set<pid_t>) -> Bool {
@@ -709,7 +710,7 @@ private final class AppButton: NSButton {
             in: rect,
             from: .zero,
             operation: .sourceOver,
-            fraction: isEnabled ? (isHovering || isHighlighted ? (usesTransparentStyle ? 0.9 : 1) : (usesTransparentStyle ? 0.72 : 1)) : 0.35,
+            fraction: iconOpacity,
             respectFlipped: true,
             hints: [.interpolation: NSImageInterpolation.high]
         )
@@ -726,6 +727,13 @@ private final class AppButton: NSButton {
     private func updateAppearance() {
         let alpha: CGFloat = isHighlighted ? 0.16 : (isHovering ? 0.10 : 0)
         layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(alpha).cgColor
+        needsDisplay = true
+    }
+
+    private var iconOpacity: CGFloat {
+        guard isEnabled else { return 0.35 }
+        guard usesTransparentStyle else { return 1 }
+        return isHovering || isHighlighted ? 0.9 : 0.72
     }
 }
 
