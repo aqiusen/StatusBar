@@ -19,7 +19,9 @@ StatusBarSecondRow floats below the macOS menu bar and shows running app icons i
 
 ## Install
 
-Download `StatusBarSecondRow.app` from a release, then open it.
+Download the versioned `.dmg` from [GitHub Releases](https://github.com/aqiusen/StatusBar/releases), open it, and drag `StatusBarSecondRow.app` to `Applications`.
+
+The app in this personal-use DMG is ad-hoc signed and is not notarized. On first launch, Control-click the app and choose **Open**. If macOS still blocks it, use **System Settings > Privacy & Security > Open Anyway**. The app requires macOS 13 or later and Apple silicon.
 
 For local builds:
 
@@ -33,7 +35,9 @@ swift run
 ./scripts/package.sh
 ```
 
-The packaged app and zip are written to `dist/`.
+The packaged app, zip, and drag-to-install DMG are written to `dist/`. Set `VERSION`, `BUILD_NUMBER`, or `DIST_DIR` to customize a local build.
+
+Publishing a GitHub Release builds a versioned DMG on an Apple silicon runner and uploads it to that release. The app inside is ad-hoc signed for personal use and does not require Apple developer credentials.
 
 ## Controls
 
